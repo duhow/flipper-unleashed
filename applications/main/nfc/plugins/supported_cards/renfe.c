@@ -7,6 +7,8 @@
 
 #define TAG "Renfe & Tu"
 
+#define UID_LENGTH    4
+
 static const uint64_t renfe_key = 0x749934CC8ED3;
 static const uint64_t empty_key = 0xC0C1C2C3C4C5;
 static const uint8_t renfe_sector = 2;
@@ -117,14 +119,17 @@ static bool renfe_parse(const NfcDevice* device, FuriString* parsed_data) {
         // Verify card type
         if(data->type != MfClassicType1k) return false;
 
-        /* uint32_t renfe_card_id = 0;
+        // TODO assert Block 13 == Block 14
+        // TODO assert Block 28 == Block 29
 
-        for(size_t i = 7; i < 11; i++) {
-            tmobilitat_card_id = (tmobilitat_card_id << 8) | hist_bytes[i];
-        } */
+        furi_string_printf(parsed_data, "\e#Renfe & Tu\n");
 
-        furi_string_printf(
-            parsed_data, "\e#+Renfe & Tu\n");
+        uint8_t uid[UID_LENGTH];
+        memcpy(uid, data->iso14443_3a_data->uid, UID_LENGTH);
+
+        for(size_t i = 0; i < UID_LENGTH; i++) {
+            furi_string_cat_printf(parsed_data, "%02X", uid[i]);
+        }
 
         parsed = true;
     } while(false);

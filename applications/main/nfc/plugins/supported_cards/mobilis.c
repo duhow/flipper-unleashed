@@ -118,6 +118,8 @@ static bool mobilis_parse(const NfcDevice* device, FuriString* parsed_data) {
         // little-endian from UID + block 0 byte 5
         const uint8_t* uid_data = &data->block[0].data[0];
         uint64_t uid = (bit_lib_bytes_to_num_le(uid_data, 4) * 100) + (uid_data[4] % 100) ;
+
+        // TODO assert Block 5 == Block 6
         
         const int UID_BLOCK = 10000;
         //parse data
