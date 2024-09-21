@@ -13,8 +13,9 @@ static const uint64_t renfe_key = 0x749934CC8ED3;
 static const uint64_t empty_key = 0xC0C1C2C3C4C5;
 static const uint8_t renfe_sector = 2;
 static const uint8_t empty_sector = 9;
+static const uint8_t renfe_trip_sector = 4;
 
-bool verify_block_number(Nfc* nfc, int sector, uint64_t valid_key) {
+bool verify_sector_number(Nfc* nfc, int sector, uint64_t valid_key) {
     uint8_t block_num = mf_classic_get_first_block_num_of_sector(sector);
     FURI_LOG_D(TAG, "Verifying sector %u", sector);
 
@@ -33,15 +34,15 @@ bool renfe_verify(Nfc* nfc) {
     FURI_LOG_I(TAG, "verify");
 
     do {
-        if(!verify_block_number(nfc, renfe_sector, renfe_key)) {
-            FURI_LOG_D(TAG, "Failed to read block %u", renfe_sector);
+        if(!verify_sector_number(nfc, renfe_sector, renfe_key)) {
+            FURI_LOG_D(TAG, "Failed to read sector %u", renfe_sector);
             break;
         }
 
         // If can read this block with default empty key,
         // this card may be Mobilis Valencia
-        if(verify_block_number(nfc, empty_sector, empty_key)) {
-            FURI_LOG_D(TAG, "Did not expect to read block %u, skipping", renfe_sector);
+        if(verify_sector_number(nfc, empty_sector, empty_key)) {
+            FURI_LOG_D(TAG, "Did not expect to read sector %u, skipping", renfe_sector);
             break;
         }
 
@@ -122,6 +123,13 @@ static bool renfe_parse(const NfcDevice* device, FuriString* parsed_data) {
         // TODO assert Block 13 == Block 14
         // TODO assert Block 28 == Block 29
 
+        // should be 13
+        const uint8_t* trip = &data->block[renfe_trip_sector*4-3].data[4];
+        uint64_t date_trip = bit_lib_bytes_to_num_le(&data->block[renfe_trip_sector*4-3].data[7], 4);
+
+        uint64_t city = bit_lib_bytes_to_num_be(trip, 2) >> 4;
+        bool starts_trip = bit_lib_get_bit(trip, 12); // TODO CHECK? 12-13 are C107 when leaving, 0004 when entering
+
         furi_string_printf(parsed_data, "\e#Renfe & Tu\n");
 
         uint8_t uid[UID_LENGTH];
@@ -129,6 +137,21 @@ static bool renfe_parse(const NfcDevice* device, FuriString* parsed_data) {
 
         for(size_t i = 0; i < UID_LENGTH; i++) {
             furi_string_cat_printf(parsed_data, "%02X", uid[i]);
+        }
+
+        furi_string_cat_printf(parsed_data, "\nCiudad %llu, ", city);
+        if(starts_trip){
+            furi_string_cat_printf(parsed_data, "entra\n");
+        }else{ furi_string_cat_printf(parsed_data, "sale\n"); }
+
+        if(date_trip > 0) {
+            uint8_t dt_minute = date_trip >> (32 - 6);
+            uint8_t dt_hour = date_trip >> (32 - 6 - 5) & 0x1F;
+            uint8_t dt_day = date_trip >> (32 - 6 - 5 - 5) & 0x1F;
+            uint8_t dt_month = date_trip >> (32 - 6 - 5 - 5 - 4) & 0xF;
+            uint8_t dt_year = date_trip >> (32 - 6 - 5 - 5 - 4 - 6) & 0x3F;
+
+            furi_string_cat_printf(parsed_data, "%d-%d-20%d %d:%02d", dt_day, dt_month, dt_year, dt_hour, dt_minute);
         }
 
         parsed = true;
