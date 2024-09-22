@@ -94,6 +94,18 @@ static bool renfe_read(Nfc* nfc, NfcDevice* device) {
     return is_read;
 }
 
+void datetime_printf(FuriString* parsed_data, uint64_t date_block) {
+    if(date_block > 0) {
+        uint8_t dt_minute = date_block >> (32 - 6);
+        uint8_t dt_hour = date_block >> (32 - 6 - 5) & 0x1F;
+        uint8_t dt_day = date_block >> (32 - 6 - 5 - 5) & 0x1F;
+        uint8_t dt_month = date_block >> (32 - 6 - 5 - 5 - 4) & 0xF;
+        uint8_t dt_year = date_block >> (32 - 6 - 5 - 5 - 4 - 6) & 0x3F;
+
+        furi_string_cat_printf(parsed_data, "%d-%d-20%d %d:%02d", dt_day, dt_month, dt_year, dt_hour, dt_minute);
+    }
+}
+
 static bool renfe_parse(const NfcDevice* device, FuriString* parsed_data) {
     furi_assert(device);
     furi_assert(parsed_data);
@@ -139,19 +151,32 @@ static bool renfe_parse(const NfcDevice* device, FuriString* parsed_data) {
             furi_string_cat_printf(parsed_data, "%02X", uid[i]);
         }
 
-        furi_string_cat_printf(parsed_data, "\nCiudad %llu, ", city);
-        if(starts_trip){
-            furi_string_cat_printf(parsed_data, "entra\n");
-        }else{ furi_string_cat_printf(parsed_data, "sale\n"); }
+        if (city == 0 && date_trip == 0) {
+            furi_string_cat_printf(parsed_data, "\nSin usar\n");
+        } else {
+            furi_string_cat_printf(parsed_data, "\nCiudad %llu, ", city);
+            if(starts_trip){
+                furi_string_cat_printf(parsed_data, "entra\n");
+            }else{ furi_string_cat_printf(parsed_data, "sale\n"); }
+        }
 
-        if(date_trip > 0) {
-            uint8_t dt_minute = date_trip >> (32 - 6);
-            uint8_t dt_hour = date_trip >> (32 - 6 - 5) & 0x1F;
-            uint8_t dt_day = date_trip >> (32 - 6 - 5 - 5) & 0x1F;
-            uint8_t dt_month = date_trip >> (32 - 6 - 5 - 5 - 4) & 0xF;
-            uint8_t dt_year = date_trip >> (32 - 6 - 5 - 5 - 4 - 6) & 0x3F;
+        if (date_trip > 0) {
+            datetime_printf(parsed_data, date_trip);
+            furi_string_cat_printf(parsed_data, "\n");
+        }
 
-            furi_string_cat_printf(parsed_data, "%d-%d-20%d %d:%02d", dt_day, dt_month, dt_year, dt_hour, dt_minute);
+        uint64_t date_purchase = bit_lib_bytes_to_num_le(&data->block[15*4-3].data[10], 4);
+
+        if (date_purchase > 0) {
+            datetime_printf(parsed_data, date_purchase);
+            furi_string_cat_printf(parsed_data, " recarga\n");
+        }
+
+        uint64_t date_previous_purchase = bit_lib_bytes_to_num_le(&data->block[16*4-3].data[10], 4);
+
+        if (date_previous_purchase > 0) {
+            datetime_printf(parsed_data, date_previous_purchase);
+            furi_string_cat_printf(parsed_data, " anterior");
         }
 
         parsed = true;
