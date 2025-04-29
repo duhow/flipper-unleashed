@@ -75,6 +75,24 @@ App(
 )
 
 App(
+    appid="mobilis_parser",
+    apptype=FlipperAppType.PLUGIN,
+    entry_point="mobilis_plugin_ep",
+    targets=["f7"],
+    requires=["nfc"],
+    sources=["plugins/supported_cards/mobilis.c"],
+)
+
+App(
+    appid="renfe_parser",
+    apptype=FlipperAppType.PLUGIN,
+    entry_point="renfe_plugin_ep",
+    targets=["f7"],
+    requires=["nfc"],
+    sources=["plugins/supported_cards/renfe.c"],
+)
+
+App(
     appid="opal_parser",
     apptype=FlipperAppType.PLUGIN,
     entry_point="opal_plugin_ep",
