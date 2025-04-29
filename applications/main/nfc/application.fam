@@ -57,6 +57,24 @@ App(
 )
 
 App(
+    appid="tmobilitat_ev2_parser",
+    apptype=FlipperAppType.PLUGIN,
+    entry_point="tmobilitat_ev2_plugin_ep",
+    targets=["f7"],
+    requires=["nfc"],
+    sources=["plugins/supported_cards/tmobilitat.c"],
+)
+
+App(
+    appid="tmobilitat_cipurse_parser",
+    apptype=FlipperAppType.PLUGIN,
+    entry_point="tmobilitat_cipurse_plugin_ep",
+    targets=["f7"],
+    requires=["nfc"],
+    sources=["plugins/supported_cards/tmobilitat.c"],
+)
+
+App(
     appid="opal_parser",
     apptype=FlipperAppType.PLUGIN,
     entry_point="opal_plugin_ep",
