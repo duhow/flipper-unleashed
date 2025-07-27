@@ -346,8 +346,7 @@ static bool renfe_parse(const NfcDevice* device, FuriString* parsed_data) {
         // should be 13
         const uint8_t* trip = &data->block[renfe_trip_sector*4-3].data[5];
         uint64_t date_trip = bit_lib_bytes_to_num_le(&data->block[renfe_trip_sector*4-3].data[7], 4);
-
-        uint64_t city = bit_lib_bytes_to_num_le(trip, 3) >> (1+4);
+        uint64_t city = (bit_lib_bytes_to_num_le(trip, 3) & 0x3FFFFF) >> (1+4);
         bool starts_trip = bit_lib_get_bit(trip, 4); // TODO CHECK? 12-13 are C107 when leaving, 0004 when entering
 
         furi_string_printf(parsed_data, "\e#Renfe & Tu\n");
