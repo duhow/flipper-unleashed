@@ -8,6 +8,7 @@
 #define TAG "Renfe & Tu"
 
 #define UID_LENGTH    4
+#define BLOCK         4
 
 static const uint64_t renfe_key = 0x749934CC8ED3;
 static const uint64_t empty_key = 0xC0C1C2C3C4C5;
@@ -313,6 +314,15 @@ void datetime_printf(FuriString* parsed_data, uint64_t date_block) {
         furi_string_cat_printf(parsed_data, "%d-%d-20%d %d:%02d", dt_day, dt_month, dt_year, dt_hour, dt_minute);
     }
 }
+void date_printf(FuriString* parsed_data, uint64_t date_block, uint8_t bits_carry) {
+    if(date_block > 0) {
+        uint8_t dt_day = date_block >> (bits_carry - 5) & 0x1F;
+        uint8_t dt_month = date_block >> (bits_carry - 5 - 4) & 0xF;
+        uint8_t dt_year = date_block >> (bits_carry - 5 - 4 - 6) & 0x3F;
+
+        furi_string_cat_printf(parsed_data, "%d-%d-20%d", dt_day, dt_month, dt_year);
+    }
+}
 
 static bool renfe_parse(const NfcDevice* device, FuriString* parsed_data) {
     furi_assert(device);
@@ -390,6 +400,16 @@ static bool renfe_parse(const NfcDevice* device, FuriString* parsed_data) {
             datetime_printf(parsed_data, date_previous_purchase);
             furi_string_cat_printf(parsed_data, " anterior en\n%s\n", city_name(city_previous_purchase));
         }
+
+        furi_string_cat_printf(parsed_data, "------------\n");
+
+        uint64_t date_activate = bit_lib_bytes_to_num_le(&data->block[BLOCK*3-4].data[1], 4); // extra bits
+        uint64_t date_expiration = bit_lib_bytes_to_num_le(&data->block[BLOCK*3-4].data[4-1], 4); // extra bits
+
+        furi_string_cat_printf(parsed_data, "Activado: ");
+        date_printf(parsed_data, date_activate, 21);
+        furi_string_cat_printf(parsed_data, "\nCaduca: ");
+        date_printf(parsed_data, date_expiration, 20);
 
         parsed = true;
     } while(false);
