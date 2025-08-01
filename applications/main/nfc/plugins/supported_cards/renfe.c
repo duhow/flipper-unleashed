@@ -354,8 +354,8 @@ static bool renfe_parse(const NfcDevice* device, FuriString* parsed_data) {
         // TODO assert Block 28 == Block 29
 
         // should be 13
-        const uint8_t* trip = &data->block[renfe_trip_sector*4-3].data[5];
-        uint64_t date_trip = bit_lib_bytes_to_num_le(&data->block[renfe_trip_sector*4-3].data[7], 4);
+        const uint8_t* trip = &data->block[BLOCK*renfe_trip_sector-3].data[5];
+        uint64_t date_trip = bit_lib_bytes_to_num_le(&data->block[BLOCK*renfe_trip_sector-3].data[7], 4);
         uint64_t city = (bit_lib_bytes_to_num_le(trip, 3) & 0x3FFFFF) >> (1+4);
         bool starts_trip = bit_lib_get_bit(trip, 4); // TODO CHECK? 12-13 are C107 when leaving, 0004 when entering
 
@@ -385,18 +385,18 @@ static bool renfe_parse(const NfcDevice* device, FuriString* parsed_data) {
 
         furi_string_cat_printf(parsed_data, "------------\n");
 
-        uint64_t date_purchase = bit_lib_bytes_to_num_le(&data->block[15*4-3].data[10], 4);
+        uint64_t date_purchase = bit_lib_bytes_to_num_le(&data->block[BLOCK*15-3].data[10], 4);
 
         if (date_purchase > 0) {
-            uint64_t city_purchase = bit_lib_bytes_to_num_le(&data->block[15*4-3].data[5], 3) >> 2;
+            uint64_t city_purchase = bit_lib_bytes_to_num_le(&data->block[BLOCK*15-3].data[5], 3) >> 2;
             datetime_printf(parsed_data, date_purchase);
             furi_string_cat_printf(parsed_data, " recarga en\n%s\n", city_name(city_purchase));
         }
 
-        uint64_t date_previous_purchase = bit_lib_bytes_to_num_le(&data->block[16*4-3].data[10], 4);
+        uint64_t date_previous_purchase = bit_lib_bytes_to_num_le(&data->block[BLOCK*16-3].data[10], 4);
 
         if (date_previous_purchase > 0) {
-            uint64_t city_previous_purchase = bit_lib_bytes_to_num_le(&data->block[16*4-3].data[5], 3) >> 2;
+            uint64_t city_previous_purchase = bit_lib_bytes_to_num_le(&data->block[BLOCK*16-3].data[5], 3) >> 2;
             datetime_printf(parsed_data, date_previous_purchase);
             furi_string_cat_printf(parsed_data, " anterior en\n%s\n", city_name(city_previous_purchase));
         }
