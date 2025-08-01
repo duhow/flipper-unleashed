@@ -391,6 +391,8 @@ static bool renfe_parse(const NfcDevice* device, FuriString* parsed_data) {
             uint64_t city_purchase = bit_lib_bytes_to_num_le(&data->block[BLOCK*15-3].data[5], 3) >> 2;
             datetime_printf(parsed_data, date_purchase);
             furi_string_cat_printf(parsed_data, " recarga en\n%s\n", city_name(city_purchase));
+            uint16_t city_equipo = bit_lib_bytes_to_num_le(&data->block[BLOCK*15-3].data[1], 2);
+            furi_string_cat_printf(parsed_data, "Equipo: %i\n", city_equipo);
         }
 
         uint64_t date_previous_purchase = bit_lib_bytes_to_num_le(&data->block[BLOCK*16-3].data[10], 4);
@@ -399,6 +401,8 @@ static bool renfe_parse(const NfcDevice* device, FuriString* parsed_data) {
             uint64_t city_previous_purchase = bit_lib_bytes_to_num_le(&data->block[BLOCK*16-3].data[5], 3) >> 2;
             datetime_printf(parsed_data, date_previous_purchase);
             furi_string_cat_printf(parsed_data, " anterior en\n%s\n", city_name(city_previous_purchase));
+            uint16_t city_previous_equipo = bit_lib_bytes_to_num_le(&data->block[BLOCK*16-3].data[1], 2);
+            furi_string_cat_printf(parsed_data, "Equipo: %i\n", city_previous_equipo);
         }
 
         furi_string_cat_printf(parsed_data, "------------\n");
