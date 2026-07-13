@@ -1,0 +1,154 @@
+# Build firmware with custom NFC app
+#
+# Builds the "default" and "extra apps (e)" update packages, pulling the
+# custom NFC application from the unlshd-089e branch before compiling.
+#
+# Triggers:
+#   - Every push to any branch → uploads artifacts (14-day retention)
+#   - Push of a tag            → additionally uploads assets to the GitHub Release
+#   - Manual "Run workflow"    → same as a branch push
+#
+# The build follows the same steps as the Drone CI release pipeline:
+#   default  → base apps from xMasterX/all-the-plugins (all-the-apps-base.tgz)
+#   e        → default + extra apps (all-the-apps-extra.tgz) on top
+
+name: Build firmware
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["*"]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write   # needed to upload release assets on tag push
+  actions: read
+
+env:
+  FBT_NO_SYNC: 0
+  FORCE_NO_DIRTY: "yes"
+  FBT_GIT_SUBMODULE_SHALLOW: 1
+  # Use "release-cfw" label for tagged (release) builds, branch name otherwise
+  WORKFLOW_BRANCH_OR_TAG: ${{ github.ref_type == 'tag' && 'release-cfw' || github.head_ref || github.ref_name }}
+
+jobs:
+  build:
+    name: Build firmware
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          clean: "true"
+          # Shallow clone is fine; we only need one extra ref below
+
+      - name: Compute version vars
+        id: vars
+        shell: bash
+        run: |
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            SUFFIX="${{ github.ref_name }}"
+          else
+            SHORT="${{ github.sha }}"
+            SHORT="${SHORT:0:8}"
+            SAFE_REF="${{ github.ref_name }}"
+            SAFE_REF="${SAFE_REF//\//-}"
+            SUFFIX="${SAFE_REF}-${SHORT}"
+          fi
+          echo "suffix=${SUFFIX}"   >> "$GITHUB_OUTPUT"
+          echo "suffix_e=${SUFFIX}e" >> "$GITHUB_OUTPUT"
+
+      - name: Cache toolchain
+        uses: actions/cache@v6
+        with:
+          path: toolchain/
+          key: toolchain-${{ runner.os }}-${{ hashFiles('fbt_options.py') }}
+
+      # ══════════════════════════════════════════════════════════════════════
+      # DEFAULT build  (firmware + base app pack from all-the-plugins)
+      # ══════════════════════════════════════════════════════════════════════
+      - name: Download base app pack
+        run: |
+          wget -q https://github.com/xMasterX/all-the-plugins/releases/latest/download/all-the-apps-base.tgz
+          tar zxf all-the-apps-base.tgz
+          mkdir -p applications/main/clock_app/resources/apps
+          mkdir -p applications/main/clock_app/resources/apps_data
+          cp -R base_pack_build/artifacts-base/* applications/main/clock_app/resources/apps/
+          cp -R base_pack_build/apps_data/*       applications/main/clock_app/resources/apps_data/
+          rm -rf base_pack_build all-the-apps-base.tgz
+
+      - name: Build — default
+        env:
+          DIST_SUFFIX: ${{ steps.vars.outputs.suffix }}
+        run: |
+          rm -f build/f7-firmware-C/toolbox/version.* || true
+          ./fbt COMPACT=1 DEBUG=0 FBT_NO_SYNC="${FBT_NO_SYNC}" updater_package
+          mkdir artifacts-default
+          mv dist/f7-C/* artifacts-default/
+          echo "=== default artifacts ==="
+          ls -lah artifacts-default/
+
+      # ══════════════════════════════════════════════════════════════════════
+      # EXTRA APPS (e) build  (default base pack + extra app pack)
+      # ══════════════════════════════════════════════════════════════════════
+      - name: Download extra app pack
+        run: |
+          wget -q https://github.com/xMasterX/all-the-plugins/releases/latest/download/all-the-apps-extra.tgz
+          tar zxf all-the-apps-extra.tgz
+          mkdir -p applications/main/clock_app/resources/apps
+          cp -R extra_pack_build/artifacts-extra/* applications/main/clock_app/resources/apps/
+          rm -rf extra_pack_build all-the-apps-extra.tgz
+
+      - name: Build — extra apps (e)
+        env:
+          DIST_SUFFIX: ${{ steps.vars.outputs.suffix_e }}
+        run: |
+          rm -f build/f7-firmware-C/toolbox/version.* || true
+          ./fbt COMPACT=1 DEBUG=0 FBT_NO_SYNC="${FBT_NO_SYNC}" updater_package
+          mkdir artifacts-extra
+          mv dist/f7-C/* artifacts-extra/
+          echo "=== extra-apps artifacts ==="
+          ls -lah artifacts-extra/
+
+      - name: Upload — default artifact
+        if: success()
+        uses: actions/upload-artifact@v7
+        with:
+          name: flipper-fw-default-${{ steps.vars.outputs.suffix }}
+          path: artifacts-default/
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Upload — extra apps (e) artifact
+        if: success()
+        uses: actions/upload-artifact@v7
+        with:
+          name: flipper-fw-extra-${{ steps.vars.outputs.suffix_e }}
+          path: artifacts-extra/
+          retention-days: 14
+          if-no-files-found: error
+
+      # ══════════════════════════════════════════════════════════════════════
+      # On tag push: also upload to the GitHub Release
+      # ══════════════════════════════════════════════════════════════════════
+      - name: Upload release assets
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v3.0.2
+        with:
+          tag_name: ${{ github.ref_name }}
+          fail_on_unmatched_files: true
+          files: |
+            artifacts-default/*.tgz
+            artifacts-default/*.zip
+            artifacts-default/*.json
+            artifacts-default/*.elf
+            artifacts-default/*.dfu
+            artifacts-default/*.bin
+            artifacts-extra/*.tgz
